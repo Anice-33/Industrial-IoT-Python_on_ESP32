@@ -1,0 +1,7 @@
+# Beispielkonfiguration für die lokale MQTT-Entwicklung
+# Als mosquitto-dev.conf kopieren; diese lokale Datei wird von Git ignoriert.
+# Für ESP32-Zugriff 127.0.0.1 durch die WLAN-IPv4-Adresse des Rechners ersetzen.
+listener 1883 127.0.0.1
+listener_allow_anonymous true
+
+# Nur für den lokalen Entwicklungsaufbau: anonymer Zugriff, kein TLS.

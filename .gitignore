@@ -1,0 +1,23 @@
+# Lokale Python-Umgebungen
+.venv/
+venv/
+
+# Python-Bytecode und Werkzeug-Caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Lokale Zugangsdaten
+.env
+.env.*
+!.env.example
+secrets.py
+
+# Temporäre Laufzeitprotokolle
+logs/
+*.log
+
+# Rechnerspezifische Broker-Konfiguration
+/mosquitto-dev.conf
