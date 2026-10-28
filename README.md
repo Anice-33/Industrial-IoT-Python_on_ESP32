@@ -6,16 +6,20 @@ Zwei ESP32-S3 sollen eine Fertigungsmaschine und eine Kühleinheit simulieren. E
 
 ## Aktueller Stand
 
-Die Kommunikation ist eingerichtet: Beide Boards führen MicroPython aus und haben jeweils eine MQTT-Statusmeldung über den lokalen Mosquitto-Broker an einen Fedora-Rechner gesendet.
+Beide ESP32-S3 starten nach einem Reset automatisch und veröffentlichen
+etwa alle fünf Sekunden eine nummerierte MQTT-Statusmeldung.
+Mosquitto auf Fedora leitet die Nachrichten an einen Terminal-Abonnenten weiter.
 
 | Bestandteil | Stand |
 |---|---|
 | USB-Zugriff auf beide MicroPython-Konsolen | Geprüft |
-| MQTT-Veröffentlichung der Fertigung | Empfangen |
-| MQTT-Veröffentlichung der Kühlung | Empfangen |
-| Dauerhafter gleichzeitiger Sendebetrieb | Noch nicht getestet |
+| MQTT-Veröffentlichung beider Boards | Geprüft |
+| Automatischer Programmstart nach Reset | Geprüft |
+| Gleichzeitiger Sendebetrieb über mehr als zwei Minuten | Geprüft |
+| Automatische Wiederverbindung nach Ausfällen | Noch nicht umgesetzt |
 
-Maschinenmodelle und zentrale Python-Steuerung sind noch nicht implementiert. Der bisherige Test belegt den einzelnen Nachrichtenaustausch beider Boards.
+Maschinenmodelle und zentrale Python-Steuerung sind noch nicht implementiert.
+Der aktuelle Firmware-Stand prüft die Kommunikation.
 
 ## Aufbau
 
@@ -34,4 +38,4 @@ Maschinenmodelle und zentrale Python-Steuerung sind noch nicht implementiert. De
 
 Die [Beispielkonfiguration](mosquitto-dev.conf.example) dient als Vorlage für den lokalen Broker. Die angepasste Datei `mosquitto-dev.conf` bleibt außerhalb der Versionsverwaltung.
 
-Dokumentationsstand: 27. Oktober 2026.
+Dokumentationsstand: 28. Oktober 2026.

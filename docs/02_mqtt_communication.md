@@ -74,6 +74,50 @@ industrial/cooling/status Hello from ESP32-S3 Cooling!
 industrial/production/status Hello from ESP32-S3 Production!
 ```
 
-Damit ist der einzelne Nachrichtenaustausch beider Boards über den Broker zum Abonnenten bestätigt. Jeder Aufruf verbindet sich, sendet einmal und trennt die Verbindung. Dauerhafter gleichzeitiger Betrieb, Wiederverbindung nach Ausfällen und automatischer Programmstart wurden damit noch nicht geprüft.
+Damit ist der manuelle Nachrichtenaustausch beider Boards bestätigt.
+Der folgende Test erweitert diesen Nachweis um den automatischen Betrieb.
+
+## Automatischer Sendebetrieb
+
+Beide Boards verwenden dasselbe Programm
+[firmware/main.py](../firmware/main.py).
+Die gerätespezifischen Kennungen stehen in
+[production/config.py](../firmware/production/config.py) und
+[cooling/config.py](../firmware/cooling/config.py).
+
+Auf jedem Board liegen im Hauptverzeichnis:
+
+- `main.py`: WLAN-Verbindung, MQTT-Verbindung und Sendeschleife.
+- `config.py`: Client-ID und Status-Topic des jeweiligen Boards.
+- `secrets.py`: lokale WLAN-Zugangsdaten und Broker-Adresse;
+  diese Datei wird nicht versioniert.
+
+Nach dem Start wartet das Programm bis zu ungefähr 20 Sekunden auf die
+WLAN-Verbindung. Sobald sie besteht, verbindet es sich mit MQTT und
+veröffentlicht etwa alle fünf Sekunden `online <Zähler>`. Der Zähler
+beginnt nach jedem Programmstart wieder bei 1.
+
+### Prüfung am 28.10.2026
+
+1. Den Terminal-Abonnenten auf Fedora starten.
+2. Beide Boards über RESET/EN neu starten.
+3. Prüfen, dass beide Topics wieder mit `online 1` beginnen.
+4. Den gemeinsamen Sendebetrieb mindestens zwei Minuten beobachten.
+
+| Prüfung | Beobachtung |
+|---|---|
+| Automatischer Start nach Reset | Beide Boards sendeten ab Zähler 1 |
+| Beobachtungszeitraum | 08:03:56–08:06:16, insgesamt 2 min 20 s |
+| Zählerstände | Beide Boards von 22 bis 50 |
+| Empfangsabstand | Überwiegend fünf Sekunden; eine sichtbare Abweichung von ungefähr einer Sekunde |
+
+Die Zeitstempel wurden beim Lesen der Nachrichten auf Fedora mit
+Sekundenauflösung ergänzt. Sie zeigen die Empfangsfolge und sind
+keine genaue Messung der Übertragungslatenz. Zähler 39 fehlt im
+bereitgestellten Auszug; daraus lässt sich kein Nachrichtenverlust ableiten.
+
+Der Test bestätigt den automatischen Start und den gemeinsamen
+Sendebetrieb im beobachteten Zeitraum. Automatische Wiederverbindung
+und Fehlerbehandlung bei Verbindungsabbrüchen sind noch nicht umgesetzt.
 
 Bei Problemen: [Fehlersuche](troubleshooting.md).

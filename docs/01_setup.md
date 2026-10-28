@@ -85,4 +85,76 @@ mosquitto -c mosquitto-dev.conf -v
 
 Die Konfiguration ist für den lokalen Entwicklungsaufbau bestimmt: Sie erlaubt anonymen Zugriff und richtet keine TLS-Verschlüsselung ein.
 
-Anschließend den [MQTT-Test](02_mqtt_communication.md) durchführen.
+## 4. Lokale Firmware-Konfiguration anlegen
+
+Alle folgenden Shell-Befehle im Repository-Verzeichnis ausführen.
+Die [Vorlage](../firmware/secrets.example.py) als lokale Datei kopieren:
+
+```bash
+cp -n firmware/secrets.example.py firmware/secrets.py
+```
+
+In `firmware/secrets.py` die Platzhalter für WLAN-Name, WLAN-Passwort und
+Broker-Adresse ersetzen. `MQTT_BROKER` muss die vom Board erreichbare
+WLAN-IPv4-Adresse des Fedora-Rechners enthalten.
+Die Datei bleibt lokal und wird durch `.gitignore` ausgeschlossen.
+Die Vorlage enthält keine Zugangsdaten und wird versioniert.
+
+Prüfen, dass die lokale Datei ignoriert wird:
+
+```bash
+git check-ignore -v firmware/secrets.py
+```
+
+## 5. Firmware auf beide Boards übertragen
+
+Beide Boards verwenden [main.py](../firmware/main.py).
+Nur die Gerätekennung und das Status-Topic unterscheiden sich:
+
+| Rolle | Konfiguration im Repository | Dateiname auf dem Board |
+|---|---|---|
+| Fertigung | `firmware/production/config.py` | `config.py` |
+| Kühlung | `firmware/cooling/config.py` | `config.py` |
+
+Vor dem Übertragen mit `mpremote connect list` die Ports prüfen und den
+physischen Boards zuordnen. Die folgenden Befehle setzen Fertigung an
+`/dev/ttyACM0` und Kühlung an `/dev/ttyACM1` voraus.
+
+**Fertigungsboard:**
+
+```bash
+mpremote connect /dev/ttyACM0 fs cp firmware/secrets.py :secrets.py
+mpremote connect /dev/ttyACM0 fs cp firmware/production/config.py :config.py
+mpremote connect /dev/ttyACM0 fs cp firmware/main.py :main.py
+```
+
+**Kühlungsboard:**
+
+```bash
+mpremote connect /dev/ttyACM1 fs cp firmware/secrets.py :secrets.py
+mpremote connect /dev/ttyACM1 fs cp firmware/cooling/config.py :config.py
+mpremote connect /dev/ttyACM1 fs cp firmware/main.py :main.py
+```
+
+Das Präfix `:` bezeichnet das Dateisystem des verbundenen Boards.
+Die Befehle schreiben `secrets.py`, `config.py` und `main.py` in dessen
+Hauptverzeichnis und ersetzen dort gleichnamige Dateien.
+`boot.py` und die installierte MQTT-Bibliothek bleiben erhalten.
+Die Vorlage `secrets.example.py` wird nicht auf die Boards kopiert.
+
+## 6. Automatischen Start prüfen
+
+1. Den Abonnenten in einem eigenen Fedora-Terminal starten. Die Beispieladresse
+   durch die aktuelle Broker-Adresse ersetzen:
+
+   ```bash
+   mosquitto_sub -h 192.168.178.28 -t 'industrial/+/status' -v
+   ```
+
+2. Beide Boards über RESET/EN neu starten. MicroPython führt die jeweilige
+   `main.py` automatisch aus.
+3. Auf beiden Topics muss der Zähler bei `online 1` beginnen und ungefähr alle
+   fünf Sekunden steigen. Beide Boards mindestens zwei Minuten beobachten.
+
+Mit Strg-C endet der Terminal-Abonnent; die Boards senden weiter.
+Testergebnis und Grenzen stehen unter [MQTT-Kommunikation](02_mqtt_communication.md).
