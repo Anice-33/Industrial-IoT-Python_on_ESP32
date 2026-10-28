@@ -1,5 +1,8 @@
 import network
 import time
+import json
+import os
+import binascii
 from umqtt.simple import MQTTClient
 
 from config import CLIENT_ID, STATUS_TOPIC
@@ -30,12 +33,20 @@ client = MQTTClient(
 )
 client.connect()
 print("MQTT verbunden:", CLIENT_ID)
-
+session_id = binascii.hexlify(os.urandom(8)).decode()
 counter = 0
 
 while True:
     counter += 1
-    payload = "online {}".format(counter)
+
+    message = {
+        "device_id": CLIENT_ID,
+        "session_id": session_id,
+        "seq": counter,
+        "status": "online",
+    }
+
+    payload = json.dumps(message)
     client.publish(STATUS_TOPIC, payload.encode())
     print(STATUS_TOPIC, payload)
     time.sleep(5)

@@ -153,8 +153,12 @@ Die Vorlage `secrets.example.py` wird nicht auf die Boards kopiert.
 
 2. Beide Boards über RESET/EN neu starten. MicroPython führt die jeweilige
    `main.py` automatisch aus.
-3. Auf beiden Topics muss der Zähler bei `online 1` beginnen und ungefähr alle
-   fünf Sekunden steigen. Beide Boards mindestens zwei Minuten beobachten.
+3. Auf beiden Topics muss eine JSON-Statusmeldung mit `seq` gleich 1 erscheinen.
+   Die Sequenznummer steigt ungefähr alle fünf Sekunden. `session_id` bleibt
+   während eines Programmlaufs gleich und wird beim nächsten Start neu erzeugt.
+   Beide Boards mindestens zwei Minuten beobachten.
 
 Mit Strg-C endet der Terminal-Abonnent; die Boards senden weiter.
-Testergebnis und Grenzen stehen unter [MQTT-Kommunikation](02_mqtt_communication.md).
+Die automatische Prüfung auf Fedora erfolgt mit
+[tools/validate_status.py](../tools/validate_status.py). Aufruf, Testergebnisse
+und Grenzen stehen unter [MQTT-Kommunikation](02_mqtt_communication.md).

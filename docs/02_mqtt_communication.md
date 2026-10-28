@@ -94,10 +94,10 @@ Auf jedem Board liegen im Hauptverzeichnis:
 
 Nach dem Start wartet das Programm bis zu ungefähr 20 Sekunden auf die
 WLAN-Verbindung. Sobald sie besteht, verbindet es sich mit MQTT und
-veröffentlicht etwa alle fünf Sekunden `online <Zähler>`. Der Zähler
-beginnt nach jedem Programmstart wieder bei 1.
+veröffentlicht etwa alle fünf Sekunden eine JSON-Statusmeldung. Die
+Sequenznummer beginnt nach jedem Programmstart wieder bei 1.
 
-### Prüfung am 28.10.2026
+### Bisheriger Dauerlauftest mit Textmeldungen am 28.10.2026
 
 1. Den Terminal-Abonnenten auf Fedora starten.
 2. Beide Boards über RESET/EN neu starten.
@@ -119,5 +119,65 @@ bereitgestellten Auszug; daraus lässt sich kein Nachrichtenverlust ableiten.
 Der Test bestätigt den automatischen Start und den gemeinsamen
 Sendebetrieb im beobachteten Zeitraum. Automatische Wiederverbindung
 und Fehlerbehandlung bei Verbindungsabbrüchen sind noch nicht umgesetzt.
+
+## JSON-Statusmeldungen
+
+Die aktuelle Firmware ersetzt `online <Zähler>` durch ein JSON-Objekt.
+Beispiel einer Fertigungsmeldung:
+
+```json
+{"device_id":"esp32-production","session_id":"0123456789abcdef","seq":1,"status":"online"}
+```
+
+| Feld | Bedeutung und Prüfung |
+|---|---|
+| `device_id` | Gerätekennung; muss zum Status-Topic passen |
+| `session_id` | 16 kleine Hexadezimalzeichen; einmal pro Programmlauf zufällig erzeugt |
+| `seq` | Positive Ganzzahl; beginnt bei 1 und steigt je Veröffentlichung |
+| `status` | Derzeit ausschließlich `online` |
+
+Beim Erzeugen einer Sitzung werden acht Zufallsbytes als Hexadezimaltext
+kodiert. Im Test blieb die Kennung innerhalb eines Programmlaufs konstant;
+bei einem Neustart des Fertigungsboards wurde eine andere Kennung beobachtet.
+Beide Boards sendeten anschließend JSON mit ihrer jeweiligen Gerätekennung.
+Die Reihenfolge der JSON-Felder ist für die Prüfung unerheblich.
+
+### Validierung auf Fedora
+
+[tools/validate_status.py](../tools/validate_status.py) liest die Ausgabe von
+`mosquitto_sub` über die Standardeingabe. Topic und JSON-Inhalt werden getrennt,
+die Felder geprüft und das Ergebnis als `OK` oder `UNGÜLTIG` ausgegeben.
+Im Repository-Verzeichnis starten und die Broker-Adresse bei Bedarf anpassen:
+
+```bash
+mosquitto_sub -h 192.168.178.28 -t 'industrial/+/status' -v |
+python3 -u tools/validate_status.py
+```
+
+### Geprüfte Fälle am 28.10.2026
+
+| Eingabe | Beobachtetes Ergebnis |
+|---|---|
+| JSON-Meldungen beider Boards | Mit `OK` ausgegeben |
+| Kühlungskennung auf dem Fertigungs-Topic | `UNGÜLTIG: Gerätekennung passt nicht zum Topic` |
+| Inhalt `kein JSON` | Mit einem JSON-Parserfehler als `UNGÜLTIG` ausgegeben |
+| Weitere Board-Meldungen nach beiden Fehlern | Weiterhin mit `OK` verarbeitet |
+
+Die beiden ungültigen Nachrichten wurden in einem zweiten Terminal gezielt
+veröffentlicht, während der Validator lief:
+
+```bash
+mosquitto_pub -h 192.168.178.28 \
+  -t 'industrial/production/status' \
+  -m '{"device_id":"esp32-cooling","session_id":"0123456789abcdef","seq":1,"status":"online"}'
+
+mosquitto_pub -h 192.168.178.28 \
+  -t 'industrial/production/status' \
+  -m 'kein JSON'
+```
+
+Der Validator prüft jede Nachricht einzeln. Er erkennt noch keine
+Sequenzlücken, Duplikate oder veralteten Sitzungen. `online` ist eine
+Statusmeldung des Programms, keine dauerhaft gültige Verfügbarkeitsgarantie.
 
 Bei Problemen: [Fehlersuche](troubleshooting.md).
