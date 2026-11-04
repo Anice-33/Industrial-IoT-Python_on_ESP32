@@ -21,3 +21,6 @@ logs/
 
 # Rechnerspezifische Broker-Konfiguration
 /mosquitto-dev.conf
+
+# Temporäre Kate-Dateien
+*.kate-swp

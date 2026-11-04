@@ -41,3 +41,13 @@ sie besitzen keine getrennten Implementierungs-Commits.
 - **Erkenntnis:** Syntaktisch gültiges JSON kann inhaltlich falsch sein. Topic und Gerätekennung müssen zusammenpassen; eine Sitzungskennung unterscheidet Programmläufe.
 - **Offen:** Der Validator prüft einzelne Nachrichten, aber noch keine Sequenzlücken, Duplikate oder veralteten Sitzungen.
 - **Git:** Dieser Eintrag wird zusammen mit JSON-Firmware und Validator im M4-Commit versioniert.
+
+## M5 – Lokale Simulation von Fertigung und Kühlung
+
+- **Ziel:** Temperaturentwicklung und verzögerte Kühlleistung nachvollziehbar simulieren.
+- **Änderung:** Temperatur- und Kühlmodell als getrennte Funktionen implementiert. Ein Runner liest JSON-Szenarien, verarbeitet zeitgesteuerte Änderungen und gibt Temperatur sowie gelieferte Kühlleistung als CSV aus.
+- **Nachweis:** Normalbetrieb, Lasterhöhung, konstante Kühlung und unmittelbarer Kühlungsausfall ausgeführt. Beide Modelle anschließend für Anlauf und normales Abschalten gekoppelt.
+- **Ergebnisse:** Bei einer konstanten Kühlanforderung von 100 W stieg die Temperatur zunächst auf rund 25,333 °C und sank bis Sekunde 60 auf 24,401 °C. Nach Abschalten der Anforderung bei Sekunde 30 betrugen die Temperatur nach 60 Sekunden 26,418 °C und die verbleibende Kühlleistung 4,059 W.
+- **Erkenntnis:** Angeforderte und gelieferte Kühlleistung unterscheiden sich. Normales Abschalten führt im Modell zu einem allmählichen Rückgang; ein vollständiger Kühlungsausfall wird dagegen als sofortiger Wegfall dargestellt.
+- **Grenzen:** Die Parameter sind illustrative Beispielwerte, keine kalibrierten Messdaten. Die Modelle laufen bisher lokal auf Fedora. Die ESP32-Firmware veröffentlicht weiterhin Statusmeldungen; Modellintegration über MQTT und automatische Regelung sind noch nicht umgesetzt.
+- **Git:** Modelle, Runner, Szenarien und Dokumentation werden gemeinsam als M5 versioniert.
