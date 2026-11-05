@@ -6,35 +6,44 @@ Zwei ESP32-S3 sollen eine Fertigungsmaschine und eine Kühleinheit simulieren. E
 
 ## Aktueller Stand
 
-Beide ESP32-S3 starten nach einem Reset automatisch und veröffentlichen
-etwa alle fünf Sekunden eine MQTT-Statusmeldung im JSON-Format mit
-Gerätekennung, Sitzungskennung und Sequenznummer. Mosquitto auf Fedora
-leitet die Nachrichten weiter; ein Python-Werkzeug prüft ihren Aufbau.
+Der verteilte Regelkreis läuft auf beiden ESP32-S3 und Fedora: Das
+Fertigungsboard berechnet seine Temperatur, das Kühlungsboard seine gelieferte
+Kühlleistung. Der Python-Controller auf Fedora entscheidet die Kühlanforderung
+und leitet die gemeldete Kühlleistung an die Fertigung weiter. Mosquitto
+vermittelt die Nachrichten.
 
 | Bestandteil | Stand |
 |---|---|
-| USB-Zugriff auf beide MicroPython-Konsolen | Geprüft |
-| MQTT-Veröffentlichung beider Boards | Geprüft |
-| Automatischer Programmstart nach Reset | Geprüft |
-| Gleichzeitiger Sendebetrieb über mehr als zwei Minuten | Geprüft |
-| JSON-Nachrichten beider Boards auf Fedora validiert | Geprüft |
-| Ungültige Nachrichten abgewiesen; Verarbeitung läuft weiter | Geprüft |
-| Lokales Temperatur- und Kühlmodell mit JSON-Szenarien | Implementiert und ausgeführt |
-| Gekoppelter Anlauf und normales Abschalten der Kühlung | Lokal geprüft |
-| Automatische Wiederverbindung nach Ausfällen | Noch nicht umgesetzt |
+| Automatischer Start und JSON-Statusmeldungen beider Boards | Geprüft |
+| Lokale Modellversuche mit sechs JSON-Szenarien | Ausgeführt |
+| Temperatur- und Kühlmodell auf den jeweiligen Boards | Ausgeführt |
+| Hystereseregelung: ab 28 °C an, bis einschließlich 26 °C aus | Normalbetrieb beobachtet |
+| Einschalten, Abkühlen, Ausschalten und erneute Erwärmung | Im gemeinsamen Lauf beobachtet |
+| Robuster Betrieb bei ungültigen Nachrichten und Ausfällen | Noch nicht abgesichert |
 
-Temperatur- und Kühlmodell laufen bisher lokal auf Fedora. Ein Szenario-Runner
-verarbeitet vorgegebene Eingaben und gibt die Ergebnisse als CSV aus.
-Die Parameter sind illustrative Beispielwerte, keine kalibrierten Messdaten.
-Die ESP32-Firmware veröffentlicht weiterhin Statusmeldungen. Die Integration
-der Modelle auf den Boards und die zentrale Python-Regelung sind noch nicht umgesetzt.
+Die Leistungen und Temperaturen sind simuliert; es werden keine realen
+Heiz- oder Kühlaktoren angesteuert. Die Parameter sind illustrative
+Beispielwerte, keine kalibrierten Messdaten. Die Boards berechnen und senden
+ungefähr einmal pro Sekunde; längere Verzögerungen werden nicht ausgeglichen.
 
 ## Aufbau
 
-- **ESP32-S3 1 – Fertigung:** MQTT-Client `esp32-production`.
-- **ESP32-S3 2 – Kühlung:** MQTT-Client `esp32-cooling`.
-- **Fedora-Rechner:** Mosquitto-Broker, Terminal-Abonnent `mosquitto_sub`, Statusvalidator und lokaler Szenario-Runner.
-- **Verbindung:** USB für die Board-Konsolen, gemeinsames WLAN für MQTT.
+- **ESP32-S3 1 – Fertigung:** `esp32-production`; berechnet Temperatur aus Heizleistung, Wärmeverlust und zuletzt empfangener Kühlleistung.
+- **ESP32-S3 2 – Kühlung:** `esp32-cooling`; nähert seine Lieferung schrittweise der angeforderten Leistung an.
+- **Mosquitto auf Fedora:** Broker für alle vier Nachrichtenthemen.
+- **Python-Controller auf Fedora:** `fedora-controller`; fordert 0 oder 100 W an und vermittelt gelieferte Kühlleistung an die Fertigung.
+- **Verbindung:** Gemeinsames WLAN für MQTT, USB für Übertragung der Firmware und Board-Konsolen.
+
+Nach der [Einrichtung](docs/01_setup.md) bei laufendem Broker starten
+(Beispieladresse gegebenenfalls ersetzen):
+
+```bash
+.venv/bin/python controller.py --broker 192.168.178.28
+```
+
+Anschließend beide Boards über RESET/EN neu starten. Mit Strg-C endet der
+Controller; das ist **keine Abschaltung der Boards**. Ohne neue Nachrichten
+verwenden diese ihre zuletzt empfangenen Eingaben weiter.
 
 ## Lokale Simulation ausführen
 
@@ -54,8 +63,8 @@ und unmittelbaren Kühlungsausfall.
 
 | Dokument | Inhalt |
 |---|---|
-| [Einrichtung](docs/01_setup.md) | Voraussetzungen, Board-Zugriff, WLAN und Broker |
-| [MQTT-Kommunikation](docs/02_mqtt_communication.md) | Gerätekennungen, Testablauf und empfangene Nachrichten |
+| [Einrichtung](docs/01_setup.md) | Voraussetzungen, Firmware-Upload und Start des Regelkreises |
+| [MQTT-Kommunikation](docs/02_mqtt_communication.md) | Topics, Nachrichtenfelder, Regelung und beobachteter Verlauf |
 | [Fehlersuche](docs/troubleshooting.md) | Bekannte Probleme und gezielte Prüfungen |
 | [Entwicklungsverlauf](docs/entwicklung.md) | Meilensteine, Nachweise, Erkenntnisse und Commit-Verweise |
 

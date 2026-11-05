@@ -5,7 +5,8 @@
 ## Voraussetzungen
 
 - Zwei ESP32-S3 mit funktionsfähiger MicroPython-REPL.
-- Fedora-Rechner mit `mpremote`, Mosquitto und `mosquitto_sub`.
+- Fedora-Rechner mit Python 3, `venv`, `mpremote`, Mosquitto und `mosquitto_sub`.
+- Paho MQTT für den Controller; Installation siehe Abschnitt 6.
 - MQTT-Bibliothek `umqtt.simple` auf beiden Boards.
 - Gemeinsames WLAN; die Boards müssen den Broker erreichen können.
 
@@ -67,7 +68,7 @@ Die Vorlage bindet den Broker zunächst an `127.0.0.1` und ist damit nur auf dem
 ip -4 address
 ```
 
-Anschließend müssen Board-Code und Terminal-Abonnent dieselbe Broker-Adresse verwenden. Im bisherigen Test war dies `192.168.178.28`; diese Adresse kann sich bei einem Netzwerkwechsel ändern.
+Anschließend müssen Boards, Controller und Terminal-Abonnent dieselbe Broker-Adresse verwenden. Im bisherigen Test war dies `192.168.178.28`; diese Adresse kann sich bei einem Netzwerkwechsel ändern.
 
 Den offenen Port im Fedora-Terminal prüfen:
 
@@ -108,22 +109,27 @@ git check-ignore -v firmware/secrets.py
 
 ## 5. Firmware auf beide Boards übertragen
 
-Beide Boards verwenden [main.py](../firmware/main.py).
-Nur die Gerätekennung und das Status-Topic unterscheiden sich:
+Beide Boards verwenden [main.py](../firmware/main.py). Ihre `config.py`
+legt Gerätekennung, Status-Topic und Eingangs-Topic fest. Die Gerätekennung
+wählt das Modell und den Anfangszustand aus.
 
-| Rolle | Konfiguration im Repository | Dateiname auf dem Board |
+| Board | Konfiguration im Repository | Zusätzliches Modell auf dem Board |
 |---|---|---|
-| Fertigung | `firmware/production/config.py` | `config.py` |
-| Kühlung | `firmware/cooling/config.py` | `config.py` |
+| Fertigung | `firmware/production/config.py` | `thermal_model.py` |
+| Kühlung | `firmware/cooling/config.py` | `cooling_model.py` |
 
-Vor dem Übertragen mit `mpremote connect list` die Ports prüfen und den
-physischen Boards zuordnen. Die folgenden Befehle setzen Fertigung an
-`/dev/ttyACM0` und Kühlung an `/dev/ttyACM1` voraus.
+Ports mit `mpremote connect list` prüfen und den physischen Boards zuordnen.
+Die folgenden Befehle setzen Fertigung an `/dev/ttyACM0` und Kühlung an
+`/dev/ttyACM1` voraus. Ein laufender Controller sollte während des Updates
+beendet sein. `mpremote` kann die Ausführung auf dem Board unterbrechen.
+
+Modell und Konfiguration zuerst, `main.py` zuletzt übertragen:
 
 **Fertigungsboard:**
 
 ```bash
 mpremote connect /dev/ttyACM0 fs cp firmware/secrets.py :secrets.py
+mpremote connect /dev/ttyACM0 fs cp firmware/production/thermal_model.py :thermal_model.py
 mpremote connect /dev/ttyACM0 fs cp firmware/production/config.py :config.py
 mpremote connect /dev/ttyACM0 fs cp firmware/main.py :main.py
 ```
@@ -132,33 +138,64 @@ mpremote connect /dev/ttyACM0 fs cp firmware/main.py :main.py
 
 ```bash
 mpremote connect /dev/ttyACM1 fs cp firmware/secrets.py :secrets.py
+mpremote connect /dev/ttyACM1 fs cp firmware/cooling/cooling_model.py :cooling_model.py
 mpremote connect /dev/ttyACM1 fs cp firmware/cooling/config.py :config.py
 mpremote connect /dev/ttyACM1 fs cp firmware/main.py :main.py
 ```
 
 Das Präfix `:` bezeichnet das Dateisystem des verbundenen Boards.
-Die Befehle schreiben `secrets.py`, `config.py` und `main.py` in dessen
-Hauptverzeichnis und ersetzen dort gleichnamige Dateien.
-`boot.py` und die installierte MQTT-Bibliothek bleiben erhalten.
-Die Vorlage `secrets.example.py` wird nicht auf die Boards kopiert.
+Die Dateien liegen dort gemeinsam im Hauptverzeichnis; gleichnamige Dateien
+werden ersetzt. Bereits passende `secrets.py` müssen nicht erneut übertragen
+werden. `boot.py` und die installierte MQTT-Bibliothek bleiben erhalten.
+Die Vorlage `secrets.example.py` wird nicht hochgeladen.
 
-## 6. Automatischen Start prüfen
+## 6. Controller auf Fedora vorbereiten
 
-1. Den Abonnenten in einem eigenen Fedora-Terminal starten. Die Beispieladresse
-   durch die aktuelle Broker-Adresse ersetzen:
+Im Repository-Verzeichnis:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+Eine vorhandene Projektumgebung kann weiterverwendet werden.
+[requirements.txt](../requirements.txt) enthält `paho-mqtt>=2.1,<3`;
+im beobachteten Lauf war Version 2.1.0 installiert. `.venv/` wird von Git ignoriert.
+Der Controller läuft auf Fedora, nicht auf den ESP32.
+
+## 7. Gemeinsamen Regelbetrieb starten
+
+1. Mosquitto mit der erreichbaren Projektadresse betreiben (Abschnitt 3).
+   Keinen zweiten Broker auf demselben Port starten.
+2. In einem weiteren Terminal genau einen Controller starten:
 
    ```bash
-   mosquitto_sub -h 192.168.178.28 -t 'industrial/+/status' -v
+   .venv/bin/python controller.py --broker 192.168.178.28
    ```
 
-2. Beide Boards über RESET/EN neu starten. MicroPython führt die jeweilige
-   `main.py` automatisch aus.
-3. Auf beiden Topics muss eine JSON-Statusmeldung mit `seq` gleich 1 erscheinen.
-   Die Sequenznummer steigt ungefähr alle fünf Sekunden. `session_id` bleibt
-   während eines Programmlaufs gleich und wird beim nächsten Start neu erzeugt.
-   Beide Boards mindestens zwei Minuten beobachten.
+3. Kühlungsboard, dann Fertigungsboard über RESET/EN neu starten.
+   MicroPython startet die jeweilige `main.py` automatisch.
+4. Im Controller Temperatur, Kühlanforderung und gemeldete Lieferung verfolgen.
+   Die Fertigung beginnt bei 25 °C; die Kühlung beginnt mit 0 W Lieferung.
+   Ab 28 °C wird 100 W angefordert, bis einschließlich 26 °C wieder 0 W.
+   Zwischen den Schwellen bleibt die vorherige Entscheidung bestehen.
+5. Mehrere Minuten beobachten: Lieferung baut sich auf, Temperatur sinkt,
+   Lieferung klingt nach dem Ausschalten ab und Temperatur steigt erneut.
 
-Mit Strg-C endet der Terminal-Abonnent; die Boards senden weiter.
-Die automatische Prüfung auf Fedora erfolgt mit
-[tools/validate_status.py](../tools/validate_status.py). Aufruf, Testergebnisse
-und Grenzen stehen unter [MQTT-Kommunikation](02_mqtt_communication.md).
+Optional alle vier Topics in einem zusätzlichen Terminal anzeigen:
+
+```bash
+mosquitto_sub -h 192.168.178.28 -t 'industrial/#' -v
+```
+
+Jedes Board veröffentlicht ungefähr einmal pro Sekunde. `seq` beginnt pro
+Programmlauf bei 1; `session_id` wird beim Start neu erzeugt. Empfang und
+Modellschritte beider Boards sind nicht zeitlich synchronisiert.
+
+Strg-C beendet den Controller, nicht die Boards. Es gibt noch keine
+Zeitüberschreitung für veraltete Eingaben und keine automatische Schutzabschaltung:
+Boards können mit der letzten Eingabe weiterrechnen. Für einen definierten
+Neustart Controller starten und beide Boards zurücksetzen.
+
+Nachrichtenvertrag und beobachtete Ergebnisse:
+[MQTT-Kommunikation](02_mqtt_communication.md).

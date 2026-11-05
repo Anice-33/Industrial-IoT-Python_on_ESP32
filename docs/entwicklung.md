@@ -49,5 +49,14 @@ sie besitzen keine getrennten Implementierungs-Commits.
 - **Nachweis:** Normalbetrieb, Lasterhöhung, konstante Kühlung und unmittelbarer Kühlungsausfall ausgeführt. Beide Modelle anschließend für Anlauf und normales Abschalten gekoppelt.
 - **Ergebnisse:** Bei einer konstanten Kühlanforderung von 100 W stieg die Temperatur zunächst auf rund 25,333 °C und sank bis Sekunde 60 auf 24,401 °C. Nach Abschalten der Anforderung bei Sekunde 30 betrugen die Temperatur nach 60 Sekunden 26,418 °C und die verbleibende Kühlleistung 4,059 W.
 - **Erkenntnis:** Angeforderte und gelieferte Kühlleistung unterscheiden sich. Normales Abschalten führt im Modell zu einem allmählichen Rückgang; ein vollständiger Kühlungsausfall wird dagegen als sofortiger Wegfall dargestellt.
-- **Grenzen:** Die Parameter sind illustrative Beispielwerte, keine kalibrierten Messdaten. Die Modelle laufen bisher lokal auf Fedora. Die ESP32-Firmware veröffentlicht weiterhin Statusmeldungen; Modellintegration über MQTT und automatische Regelung sind noch nicht umgesetzt.
-- **Git:** Modelle, Runner, Szenarien und Dokumentation werden gemeinsam als M5 versioniert.
+- **Stand bei Abschluss von M5:** Die Parameter sind illustrative Beispielwerte, keine kalibrierten Messdaten. Die Modelle liefen lokal auf Fedora; Board-Integration und automatische Regelung folgten in M6.
+- **Git:** Modelle, Runner, Szenarien und Dokumentation versioniert: [705f7d5](https://gitlab.bht-berlin.de/s90499/industrial_iot_ap/-/commit/705f7d5d58f8abc9208e41e6316c1d56cfab0087).
+
+## M6 – Verteilter Regelkreis über MQTT
+
+- **Ziel:** Fertigungsmodell, Kühlmodell und zentrale Regelung auf den vorgesehenen Rechnern verbinden.
+- **Änderung:** Das Fertigungsboard berechnet und veröffentlicht seine Temperatur. Das Kühlungsboard verarbeitet Anforderungen und meldet seine gelieferte Leistung. Der Python-Controller auf Fedora fordert ab 28 °C eine Kühlleistung von 100 W und bis einschließlich 26 °C eine Leistung von 0 W an. Dazwischen bleibt die vorherige Anforderung bestehen. Gemeldete Kühlleistung wird an die Fertigung weitergeleitet; Mosquitto vermittelt sämtliche Nachrichten.
+- **Nachweis:** Im beobachteten Lauf wurde bei 28,029 °C eingeschaltet. Die gelieferte Kühlung stieg schrittweise; die höchste angezeigte Temperatur betrug 28,273 °C. Bei 25,990 °C wurde ausgeschaltet. Die Temperatur sank kurzzeitig weiter bis 25,930 °C und stieg anschließend wieder. Der Ausschnitt endete bei 27,292 °C vor einer zweiten Einschaltung.
+- **Erkenntnis:** Die Schaltschwellen lösen Entscheidungen aus, garantieren aber keine festen Temperaturgrenzen. Verzögerte Kühlwirkung und Nachrichtenübertragung beeinflussen den Verlauf.
+- **Grenzen:** Der verbundene Normalbetrieb wurde demonstriert. Eingabevalidierung, Erkennung veralteter Daten, Schutzverhalten bei Controller-Ausfall und robuste Wiederverbindung des Gesamtsystems fehlen. Modellschritte verwenden eine feste Simulationszeit von einer Sekunde; längere Ausführungsverzögerungen werden nicht ausgeglichen. Der Controller verwendet Paho-Callbacks; asyncio und begrenzte Queues sind noch nicht integriert.
+- **Git:** Firmware, Controller, Abhängigkeiten und Dokumentation sind für den gemeinsamen M6-Commit vorbereitet.
